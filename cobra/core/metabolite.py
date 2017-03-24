@@ -10,9 +10,9 @@ from future.utils import raise_from, raise_with_traceback
 
 from cobra.exceptions import OptimizationError
 from cobra.core.formula import elements_and_molecular_weights
+from cobra.util import add_exchange
 from cobra.core.species import Species
-from cobra.util.solver import check_solver_status
-
+from cobra.util.solver import check_solver_status, get_context
 
 # Numbers are not required because of the |(?=[A-Z])? block. See the
 # discussion in https://github.com/opencobra/cobrapy/issues/128 for
@@ -68,6 +68,56 @@ class Metabolite(Species):
         """
         if self.model is not None:
             return self.model.constraints[self.id]
+
+    def knock_out(self, force_steady_state=False):
+        """'Knockout' a metabolite. This can be done in 2 ways:
+
+        1. Implementation follows the description in [1] "All fluxes around
+        the metabolite M should be restricted to only produce the
+        metabolite, for which balancing constraint of mass conservation is
+        relaxed to allow nonzero values of the incoming fluxes whereas all
+        outgoing fluxes are limited to zero."
+
+        2. Force steady state All reactions consuming the metabolite are
+        restricted to only produce the metabolite. A demand reaction is
+        added to sink the metabolite produced to keep the problem feasible
+        under the S.v = 0 constraint.
+
+
+        Knocking out a metabolite overrules the constraints set on the
+        reactions producing the metabolite.
+
+        Parameters
+        ----------
+        force_steady_state: bool
+            If True, uses approach 2.
+
+        References
+        ----------
+        .. [1] Kim, P.-J., Lee, D.-Y., Kim, T. Y., Lee, K. H., Jeong, H.,
+        Lee, S. Y., & Park, S. (2007). Metabolite essentiality elucidates
+        robustness of Escherichia coli metabolism. PNAS, 104(34), 13638-13642
+
+        """
+        # restrict reactions to produce metabolite
+        for rxn in self.reactions:
+            if rxn.metabolites[self] > 0:
+                rxn.bounds = (0, 0) if rxn.upper_bound < 0 \
+                    else (0, rxn.upper_bound)
+            elif rxn.metabolites[self] < 0:
+                rxn.bounds = (0, 0) if rxn.lower_bound > 0 \
+                    else (rxn.lower_bound, 0)
+        if force_steady_state:
+            add_exchange(self._model, self, prefix="KO_")
+        else:
+            previous_bounds = self.constraint.lb, self.constraint.ub
+            self.constraint.lb, self.constraint.ub = None, None
+            context = get_context(self)
+            if context:
+                def reset():
+                    self.constraint.lb, self.constraint.ub = previous_bounds
+
+                context(reset)
 
     @property
     def elements(self):

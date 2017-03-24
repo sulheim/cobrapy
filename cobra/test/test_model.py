@@ -133,7 +133,7 @@ class TestReactions:
                        model.metabolites.get_by_id("g6p_c")] == -2
             reaction.add_metabolites({"h_c": 1})
             assert reaction._metabolites[
-                model.metabolites.get_by_id("h_c")] == 1
+                       model.metabolites.get_by_id("h_c")] == 1
             with pytest.raises(KeyError):
                 reaction.add_metabolites({"missing": 1})
 
@@ -291,6 +291,24 @@ class TestCobraMetabolites:
         met.elements = orig_elements
         assert met.formula == orig_formula
 
+    def test_knock_out(self, model):
+        rxn = Reaction('rxn', upper_bound=10, lower_bound=-10)
+        metabolite_a = Metabolite('A')
+        metabolite_b = Metabolite('B')
+        rxn.add_metabolites({metabolite_a: -1, metabolite_b: 1})
+        model.add_reaction(rxn)
+        with model:
+            metabolite_a.knock_out()
+            assert rxn.upper_bound == 0
+            metabolite_b.knock_out()
+            assert rxn.lower_bound == 0
+            assert metabolite_a.constraint.lb is None
+            assert metabolite_a.constraint.ub is None
+        assert metabolite_a.constraint.lb == 0
+        assert metabolite_a.constraint.ub == 0
+        assert rxn.upper_bound == 10
+        assert rxn.lower_bound == -10
+
 
 class TestCobraModel:
     """test core cobra functions"""
@@ -421,7 +439,7 @@ class TestCobraModel:
         with model:
             model.add_reaction(dummy_reaction)
             assert model.reactions.get_by_id(dummy_reaction.id) == \
-                dummy_reaction
+                   dummy_reaction
             assert len(model.reactions) == old_reaction_count + 1
             assert len(model.metabolites) == old_metabolite_count + 2
             assert dummy_metabolite_1._model == model
@@ -569,7 +587,7 @@ class TestCobraModel:
                 assert model.constraints[metabolite.id].expression.has(
                     model.variables[prefix + metabolite.id])
 
-    def test_add_exchange_time_machine(self, model):
+    def test_add_exchange_context(self, model):
         for demand, prefix in {True: 'DemandReaction_',
                                False: 'SupplyReaction_'}.items():
             with model:
@@ -586,6 +604,12 @@ class TestCobraModel:
             for metabolite in model.metabolites:
                 assert prefix + metabolite.id not in model.reactions
                 assert prefix + metabolite.id not in model.variables.keys()
+
+    def test_add_exchange_for_non_existing_metabolite(self, model):
+        metabolite = Metabolite(id="a_metabolite")
+        add_exchange(model, metabolite)
+        assert model.solver.constraints[metabolite.id].expression.has(
+            model.solver.variables["DM_" + metabolite.id])
 
     def test_add_existing_exchange(self, model):
         for metabolite in model.metabolites:
