@@ -11,11 +11,10 @@ from sympy import S
 import cobra.util.solver as su
 from cobra.core import Metabolite, Model, Reaction
 from cobra.solvers import solver_dict
-from cobra.util import create_stoichiometric_matrix
+from cobra.util import create_stoichiometric_matrix, add_exchange
 
 stable_optlang = ["glpk", "cplex", "gurobi"]
 optlang_solvers = ["optlang-" + s for s in stable_optlang if s in su.solvers]
-
 
 try:
     import scipy
@@ -557,6 +556,42 @@ class TestCobraModel:
     def test_exchange_reactions(self, model):
         assert set(model.exchanges) == set([rxn for rxn in model.reactions
                                             if rxn.id.startswith("EX")])
+
+    def test_add_exchange(self, model):
+        for demand, prefix in {True: 'DemandReaction_',
+                               False: 'SupplyReaction_'}.items():
+            for metabolite in model.metabolites:
+                demand_reaction = add_exchange(model, metabolite,
+                                               demand=demand, prefix=prefix)
+                assert model.reactions.get_by_id(
+                    demand_reaction.id) == demand_reaction
+                assert demand_reaction.reactants == [metabolite]
+                assert model.constraints[metabolite.id].expression.has(
+                    model.variables[prefix + metabolite.id])
+
+    def test_add_exchange_time_machine(self, model):
+        for demand, prefix in {True: 'DemandReaction_',
+                               False: 'SupplyReaction_'}.items():
+            with model:
+                for metabolite in model.metabolites:
+                    demand_reaction = add_exchange(model, metabolite,
+                                                   demand=demand,
+                                                   prefix=prefix)
+                    assert model.reactions.get_by_id(
+                        demand_reaction.id) == demand_reaction
+                    assert demand_reaction.reactants == [metabolite]
+                    assert -model.constraints[
+                        metabolite.id].expression.has(
+                        model.variables[prefix + metabolite.id])
+            for metabolite in model.metabolites:
+                assert prefix + metabolite.id not in model.reactions
+                assert prefix + metabolite.id not in model.variables.keys()
+
+    def test_add_existing_exchange(self, model):
+        for metabolite in model.metabolites:
+            add_exchange(model, metabolite, prefix="test")
+            with pytest.raises(ValueError):
+                add_exchange(model, metabolite, prefix="test")
 
     @pytest.mark.parametrize("solver", list(solver_dict))
     def test_copy_benchmark(self, model, solver, benchmark):
