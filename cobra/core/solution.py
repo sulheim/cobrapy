@@ -173,6 +173,9 @@ class Solution(object):
         return DataFrame({'fluxes': self.fluxes,
                           'reduced_costs': self.reduced_costs})
 
+    def _repr_html_(self):
+        return self.data_frame._repr_html_()
+
 
 class LegacySolution(object):
     """

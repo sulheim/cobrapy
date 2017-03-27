@@ -1025,6 +1025,31 @@ class Reaction(Object):
                     met = Metabolite(met_id)
                 self.add_metabolites({met: num})
 
+    def _repr_html_(self):
+        return """
+        <table>
+            <tr>
+                <td><strong>Id</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>Name</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>Stoichiometry</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>GPR</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>Lower bound</strong></td><td>%f</td>
+            </tr>
+            <tr>
+                <td><strong>Upper bound</strong></td><td>%f</td>
+            </tr>
+        </table>
+        """ % (self.id, self.name, self.reaction, self.gene_reaction_rule,
+               self.lower_bound, self.upper_bound)
+
 
 def separate_forward_and_reverse_bounds(lower_bound, upper_bound):
     """Split a given (lower_bound, upper_bound) interval into a negative

@@ -279,3 +279,17 @@ class Metabolite(Species):
         from cobra.flux_analysis.summary import metabolite_summary
         return metabolite_summary(self, threshold=threshold, fva=fva,
                                   floatfmt=floatfmt, **kwargs)
+
+    def _repr_html_(self):
+        return """
+        <table>
+            <tr>
+                <td><strong>Id</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>Name</strong></td><td>%s</td>
+            </tr>
+            <tr>
+                <td><strong>Formula</strong></td><td>%s</td>
+            </tr>
+        </table>""" % (self.id, self.name, self.formula)
